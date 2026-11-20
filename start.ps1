@@ -1,4 +1,4 @@
-# VoltGuard one-command launcher (Windows PowerShell)
+# VoltGuard one-command launcher (Windows PowerShell) — Django + DRF edition
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location $root
@@ -18,10 +18,14 @@ if (-not (Test-Path (Join-Path $root 'frontend\dist\index.html'))) {
     Pop-Location
 }
 
+Write-Host 'Applying database migrations...' -ForegroundColor Cyan
+& $python manage.py migrate --noinput
+& $python manage.py seed_demo
+
 Write-Host ''
 Write-Host '  VoltGuard is starting at http://localhost:8000' -ForegroundColor Green
-Write-Host '  API docs:          http://localhost:8000/docs' -ForegroundColor DarkGray
+Write-Host '  Browsable API:     http://localhost:8000/api/health' -ForegroundColor DarkGray
 Write-Host '  Demo:              demo@voltguard.io / demo1234' -ForegroundColor DarkGray
 Write-Host ''
 
-& $python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000
+& $python manage.py runserver 127.0.0.1:8000

@@ -2,25 +2,7 @@
 
 An end-to-end, full-stack web application that turns a machine-learning research notebook into a deployable product. VoltGuard scores smart-meter readings for electricity theft, explains every prediction, and gives analysts a complete workspace for investigation.
 
-> **Live locally:** `http://localhost:8000` · **API docs:** `http://localhost:8000/docs`
-> **Demo login:** `demo@voltguard.io` / `demo1234` (or click **Try live demo** on the landing page)
-
----
-
-## What this project demonstrates
-
-This repository started as a 9-file ML experiment (dataset, notebooks, pickled model and a minimal Streamlit form). It is now a production-style application with:
-
-- A polished **marketing landing page** with hero dashboard mockup, feature sections, model performance evidence and CTAs
-- **JWT authentication** with PBKDF2-SHA256 password hashing, registration, demo access and per-user data isolation
-- A **FastAPI REST backend** that serves the original scikit-learn artifacts without retraining
-- A **React + Vite single-page app** with seven authenticated workspace pages
-- **Single-reading prediction** with tunable threshold and feature-level explainability
-- **Batch CSV analysis** with automatic rolling-average derivation, validation and CSV export
-- **SQLite persistence** for prediction history, filters, detail views and deletion
-- **Dataset analytics** with interactive charts, distributions, correlations and feature statistics
-- A **model card** documenting metrics, hyperparameters, training pipeline and methodological caveats
-- Automated **API tests**, Docker packaging and one-command start scripts
+> **Live locally:** `http://localhost:8000` · **Demo login:** `demo@voltguard.io` / `demo1234` (or click **Try live demo** on the landing page)
 
 ---
 
@@ -29,49 +11,53 @@ This repository started as a 9-file ML experiment (dataset, notebooks, pickled m
 | Layer | Technology | Purpose |
 |---|---|---|
 | Frontend | React 18, Vite 6, React Router, Recharts, Lucide icons | Responsive SPA, landing page, dashboards and charts |
-| Backend | FastAPI, Pydantic v2, SQLAlchemy 2, SQLite | REST API, validation, auth, persistence |
+| Backend | **Django 5.2, Django REST Framework 3.16, django-cors-headers** | REST API, validation, ORM, persistence |
+| Auth | **Custom JWT authentication (PyJWT) + Django PBKDF2-SHA256 hashing** | Stateless auth and per-user data isolation |
 | ML serving | scikit-learn RandomForest, StandardScaler, joblib, pandas/numpy | Inference from the original trained artifacts |
-| Security | JWT (PyJWT), PBKDF2-SHA256, CORS | Stateless auth and protected endpoints |
-| Tooling | pytest, httpx, Docker, PowerShell/Bash scripts | Tests, containerization and local startup |
+| Tooling | Django test runner, Docker, PowerShell/Bash scripts | Tests, containerization and local startup |
+
+The original FastAPI implementation is preserved in `backend/` as a reference; the running application is the Django/DRF version in `voltguard/` + `api/`.
 
 ---
 
 ## Quick start
 
-### Option 1 — one command (Windows)
+### Option 1 — one command (Windows PowerShell)
 
 ```powershell
 .\start.ps1
 ```
 
-The script creates a virtual environment (reusing installed ML packages), installs Python dependencies, builds the React app if needed, and starts the server at **http://localhost:8000**.
+The script creates/reuses `.venv`, builds the React app if needed, runs `migrate` + `seed_demo`, then starts Django at **http://localhost:8000**.
+
+If PowerShell blocks the script:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\start.ps1
+```
 
 ### Option 2 — manual
 
 ```powershell
-# 1. Python environment
 python -m venv --system-site-packages .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 
-# 2. Frontend
-cd frontend
-npm install
-npm run build
-cd ..
-
-# 3. Serve everything from FastAPI
-python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000
+python manage.py migrate
+python manage.py seed_demo
+python manage.py runserver 127.0.0.1:8000
 ```
 
-For frontend development with hot reload, run the API and Vite separately:
+Open **http://localhost:8000**. The built React app is served by Django; if `frontend/dist` does not exist, run `cd frontend; npm install; npm run build` first.
+
+For frontend hot reload, run Django and Vite in two terminals:
 
 ```powershell
-python -m uvicorn backend.main:app --reload          # terminal 1 → :8000
-cd frontend; npm run dev                              # terminal 2 → :5173
+python manage.py runserver 127.0.0.1:8000   # terminal 1 → :8000
+cd frontend; npm run dev                    # terminal 2 → :5173
 ```
 
-Vite proxies `/api` to port 8000, so both setups use the same backend.
+CORS is configured for `:5173` and `:3000`, and the Vite proxy forwards `/api` to Django.
 
 ### Option 3 — Docker
 
@@ -100,26 +86,26 @@ docker compose up --build
 
 ## API reference
 
-All endpoints are prefixed with `/api`. Interactive Swagger UI is available at `/docs`.
+All endpoints are prefixed with `/api`. DRF's browsable API renderer is enabled — open an endpoint in the browser (e.g. `/api/health`) to inspect it.
 
 | Method | Endpoint | Auth | Description |
 |---|---|---|---|
-| `GET` | `/health` | No | Service health and loaded feature names |
-| `GET` | `/model/info` | No | Metrics, parameters, feature importances and pipeline notes |
-| `POST` | `/auth/register` | No | Create an account and receive a JWT |
-| `POST` | `/auth/login` | No | Authenticate with email/password |
-| `POST` | `/auth/demo` | No | One-click demo token |
-| `GET` | `/auth/me` | Yes | Current user profile |
-| `POST` | `/predict` | Yes | Score one reading and persist the result |
-| `POST` | `/predict/batch` | Yes | Upload a CSV and score up to 2,000 rows |
-| `GET` | `/history` | Yes | Paginated, filterable prediction history |
-| `DELETE` | `/history/{id}` | Yes | Delete one of your predictions |
-| `GET` | `/stats` | Yes | Dashboard aggregates and recent activity |
-| `GET` | `/analytics/overview` | Yes | Dataset summary and feature statistics |
-| `GET` | `/analytics/timeseries` | Yes | Sampled consumption timeline with labels |
-| `GET` | `/analytics/distributions` | Yes | Histogram bins per feature and class |
-| `GET` | `/analytics/correlation` | Yes | Pearson correlation matrix |
-| `GET` | `/analytics/samples` | Yes | Example normal and theft readings |
+| `GET` | `/api/health` | No | Service health and loaded feature names |
+| `GET` | `/api/model/info` | No | Metrics, parameters, feature importances and pipeline notes |
+| `POST` | `/api/auth/register` | No | Create an account and receive a JWT |
+| `POST` | `/api/auth/login` | No | Authenticate with email/password |
+| `POST` | `/api/auth/demo` | No | One-click demo token |
+| `GET` | `/api/auth/me` | Yes | Current user profile |
+| `POST` | `/api/predict` | Yes | Score one reading and persist the result |
+| `POST` | `/api/predict/batch` | Yes | Upload a CSV and score up to 2,000 rows |
+| `GET` | `/api/history` | Yes | Paginated, filterable prediction history |
+| `DELETE` | `/api/history/{id}` | Yes | Delete one of your predictions |
+| `GET` | `/api/stats` | Yes | Dashboard aggregates and recent activity |
+| `GET` | `/api/analytics/overview` | Yes | Dataset summary and feature statistics |
+| `GET` | `/api/analytics/timeseries` | Yes | Sampled consumption timeline with labels |
+| `GET` | `/api/analytics/distributions` | Yes | Histogram bins per feature and class |
+| `GET` | `/api/analytics/correlation` | Yes | Pearson correlation matrix |
+| `GET` | `/api/analytics/samples` | Yes | Example normal and theft readings |
 
 Example single prediction:
 
@@ -139,7 +125,29 @@ Timestamp,Electricity_Consumed,Temperature,Humidity,Wind_Speed
 2024-01-01 00:00:00,0.4577,0.4695,0.3963,0.4454
 ```
 
-`Avg_of_past12` is optional — when omitted, the API derives a 12-reading rolling mean exactly as the preprocessing notebook does.
+`Avg_of_past12` is optional — the API derives a 12-reading rolling mean exactly as the preprocessing notebook does.
+
+---
+
+## Django ↔ FastAPI mapping
+
+This project was ported from FastAPI to Django REST Framework. If you know one, here is where to find the equivalent in the other:
+
+| FastAPI | Django / DRF | File here |
+|---|---|---|
+| `uvicorn backend.main:app` | `python manage.py runserver` | `manage.py` |
+| `config.py` | `settings.py` | `voltguard/settings.py` |
+| `main.py` (app + routes + SPA host) | project `urls.py` | `voltguard/urls.py` |
+| `backend/routers/*.py` | `@api_view` functions | `api/views.py` |
+| `backend/schemas.py` (Pydantic) | `api/serializers.py` (DRF) | `api/serializers.py` |
+| `backend/models.py` (SQLAlchemy) | Django ORM models | `api/models.py` |
+| `auth.py` HTTPBearer dependency | `JWTAuthentication` class | `api/auth.py` |
+| `Depends(get_db)` | ORM queries via `Model.objects` | `api/views.py` |
+| `lifespan` seeding | `manage.py seed_demo` command | `api/management/commands/seed_demo.py` |
+| `/docs` Swagger | DRF browsable API | any `/api/...` endpoint in a browser |
+| `pytest backend/tests` | `python manage.py test api` | `api/tests.py` |
+
+The ML module was copied unchanged apart from reading paths from Django settings: `api/ml_service.py`.
 
 ---
 
@@ -172,9 +180,9 @@ Raw half-hourly readings (5,000 rows, 5% abnormal)
 
 Feature importance: `Electricity_Consumed` 43.7%, `Avg_of_past12` 39.7%, `Temperature` 6.1%, `Wind_Speed` 5.7%, `Humidity` 4.8%.
 
-**Honest caveats (documented in the app's model card):** scaling and SMOTE were applied before the split in the original notebook, and metrics are measured on a class-balanced test set rather than the real 5% prevalence. A production retrain should fit preprocessing inside a cross-validated pipeline and validate on unresampled data.
+**Honest caveats:** scaling and SMOTE were applied before the split in the original notebook, and metrics are measured on a class-balanced test set rather than the real 5% prevalence. A production retrain should fit preprocessing inside a cross-validated pipeline and validate on unresampled data.
 
-The training notebooks remain in `Notebooks/` for transparency. `requirements-training.txt` preserves their original pinned environment.
+The training notebooks remain in `Notebooks/`. `requirements-training.txt` preserves their original pinned environment.
 
 ---
 
@@ -182,28 +190,26 @@ The training notebooks remain in `Notebooks/` for transparency. `requirements-tr
 
 ```
 Electric_Energy_Theft_Detection_System/
-├── backend/
-│   ├── main.py                 # FastAPI app, lifespan, SPA hosting
-│   ├── config.py               # Paths, secret key, demo credentials
-│   ├── database.py             # SQLAlchemy engine/session
-│   ├── models.py               # User and Prediction tables
-│   ├── schemas.py              # Pydantic request/response models
-│   ├── auth.py                 # Hashing and JWT dependencies
-│   ├── ml_service.py           # Model loading, inference, analytics
-│   ├── routers/                # auth, predictions, analytics, system
-│   └── tests/test_api.py       # 7 API smoke tests
-├── frontend/
-│   ├── src/pages/              # Landing, auth and 7 workspace pages
-│   ├── src/components/         # Layout, navbar, footer, shared UI
-│   ├── src/context/            # Auth provider
-│   ├── src/lib/                # API client and utilities
-│   └── dist/                   # Production build served by FastAPI
-├── Dataset/                    # Raw and processed CSVs
-├── Models/                     # Trained RandomForest + scaler
-├── Notebooks/                  # Original preprocessing, training, EDA
+├── manage.py                  # Django CLI entry point
+├── voltguard/                 # Django project: settings, root URLs, ASGI/WSGI
+├── api/                       # Django app
+│   ├── models.py              # User + Prediction ORM models
+│   ├── serializers.py         # DRF request/response validation
+│   ├── views.py               # All API endpoints
+│   ├── urls.py                # /api/... routes
+│   ├── auth.py                # JWT authentication class
+│   ├── ml_service.py          # Model loading, inference, analytics
+│   ├── seed.py                # Demo account/activity seeding helpers
+│   ├── management/commands/seed_demo.py
+│   └── tests.py               # API smoke tests
+├── backend/                   # Legacy FastAPI implementation (reference only)
+├── frontend/                  # React + Vite SPA (built into frontend/dist)
+├── Dataset/                   # Raw and processed CSVs
+├── Models/                    # Trained RandomForest + scaler
+├── Notebooks/                 # Original preprocessing, training, EDA
 ├── Dockerfile / docker-compose.yml
-├── requirements.txt            # Runtime + test dependencies
-├── requirements-training.txt   # Original notebook dependencies
+├── requirements.txt           # Django + DRF runtime and test dependencies
+├── requirements-fastapi.txt   # Legacy FastAPI dependencies
 ├── start.ps1 / start.sh
 └── README.md
 ```
@@ -212,32 +218,19 @@ Electric_Energy_Theft_Detection_System/
 
 ## Testing
 
-```bash
-.\.venv\Scripts\python -m pytest backend/tests -q
-# 7 passed
+```powershell
+.\.venv\Scripts\python manage.py test api -v 2
+# 8 passed
 ```
 
-Tests cover health, model info, registration/login/duplicates, auth enforcement, single prediction persistence, batch scoring with auto-derived rolling averages and all analytics endpoints.
+Tests cover health, model info, registration/login/duplicates, auth enforcement, single prediction persistence, batch scoring with auto-derived rolling averages, all analytics endpoints and the SPA fallback.
 
 ---
 
 ## Resume talking points
 
-- Migrated a notebook-only ML prototype into a **full-stack product** with a landing page, authenticated workspace and persistent data layer.
-- Built a **FastAPI model-serving layer** around pre-trained scikit-learn artifacts, including CSV batch inference and a tunable decision threshold.
-- Implemented **JWT auth**, PBKDF2 password hashing and per-user prediction isolation.
-- Designed a **React analytics dashboard** with Recharts visualisations, explainable predictions and exportable reports.
-- Documented **model limitations** honestly (pre-split SMOTE, balanced test set) instead of overstating accuracy.
-
----
-
-## Future improvements
-
-- Move to PostgreSQL and add role-based access control for production deployments
-- Retrain with SMOTE inside an sklearn `Pipeline` and select the threshold via cross-validated cost analysis
-- Add background workers (Celery/Redis) for very large batch jobs
-- Add alerting (email/webhooks) and meter-level dashboards for utility operators
-
----
-
-**Author:** Yaseen Naik · [Source repository](https://github.com/yaseennaik/Electric_Energy_Theft_Detection_System)
+- Migrated a notebook-only ML prototype into a full-stack Django REST product with a landing page, authenticated workspace and persistent data layer.
+- Built a DRF model-serving layer around pre-trained scikit-learn artifacts, including CSV batch inference and a tunable decision threshold.
+- Implemented custom JWT authentication, PBKDF2 password hashing and per-user query isolation.
+- Designed a React analytics dashboard with Recharts visualisations, explainable predictions and exportable reports.
+- Documented model limitations honestly (pre-split SMOTE, balanced test set) instead of overstating accuracy.

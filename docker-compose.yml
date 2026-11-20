@@ -6,6 +6,7 @@ services:
     environment:
       VOLTGUARD_SECRET_KEY: "change-this-secret-in-production"
       VOLTGUARD_DB_PATH: "/app/data/voltguard.db"
+      VOLTGUARD_DEBUG: "0"
     volumes:
       - voltguard-data:/app/data
 

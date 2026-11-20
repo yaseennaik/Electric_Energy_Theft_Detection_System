@@ -14,9 +14,14 @@ if [ ! -f "frontend/dist/index.html" ]; then
   (cd frontend && npm install && npm run build)
 fi
 
+echo "Applying database migrations..."
+.venv/bin/python manage.py migrate --noinput
+.venv/bin/python manage.py seed_demo
+
 echo ""
 echo "  VoltGuard → http://localhost:8000"
-echo "  API docs  → http://localhost:8000/docs"
+echo "  API       → http://localhost:8000/api/health"
+echo "  Demo      → demo@voltguard.io / demo1234"
 echo ""
 
-.venv/bin/python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000
+.venv/bin/python manage.py runserver 127.0.0.1:8000
