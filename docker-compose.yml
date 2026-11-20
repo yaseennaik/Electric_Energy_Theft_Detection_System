@@ -1,0 +1,13 @@
+services:
+  voltguard:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      VOLTGUARD_SECRET_KEY: "change-this-secret-in-production"
+      VOLTGUARD_DB_PATH: "/app/data/voltguard.db"
+    volumes:
+      - voltguard-data:/app/data
+
+volumes:
+  voltguard-data:
